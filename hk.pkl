@@ -1,0 +1,44 @@
+amends "package://github.com/jdx/hk/releases/download/v1.36.0/hk@1.36.0#/Config.pkl"
+
+local linters = new Mapping<String, Step> {
+  // Go linting and formatting
+  ["lint-and-format-go"] {
+    glob = List("*.go", "go.mod", "go.sum")
+    fix = "mise run lint-and-format-go"
+  }
+
+  // Markdown formatting
+  ["format-markdown"] {
+    glob = "**/*.md"
+    fix = "mise run format-markdown"
+  }
+
+  // YAML formatting
+  ["format-yaml"] {
+    glob = "**/*.{yml,yaml}"
+    fix = "mise run format-yaml"
+  }
+}
+
+local tests = new Mapping<String, Step> {
+  // Unit tests
+  ["unit-test"] {
+    depends = "lint-and-format-go"
+    glob = List("*.go", "go.mod", "go.sum")
+    fix = "mise run unit-test"
+  }
+}
+
+local pre_commit_steps = new Mapping<String, Step> {
+  ...linters
+  ...tests
+}
+
+hooks {
+  ["pre-commit"] {
+    stage = true
+    fix = true
+    stash = "git"
+    steps = pre_commit_steps
+  }
+}

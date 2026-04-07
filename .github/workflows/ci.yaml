@@ -1,0 +1,66 @@
+name: CI
+on:
+  pull_request:
+
+env:
+  GOPRIVATE: github.com/khalilonline
+
+jobs:
+  path-filters:
+    runs-on: ubuntu-latest
+    outputs:
+      golang: ${{ steps.filter.outputs.golang }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: dorny/paths-filter@v3.0.2
+        id: filter
+        with:
+          filters: |
+            golang:
+              - '**/*.go'
+              - '**/go.mod'
+              - '**/go.sum'
+
+  lint-and-format:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+
+      - run: mise run lint-and-format
+
+      - name: Auto Commit
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "chore: automated linting"
+          commit_user_name: auto-gen-bot
+
+  unit-test:
+    needs: [ path-filters, lint-and-format ]
+    if: ${{ !cancelled() && needs.path-filters.outputs.golang == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+            ref: ${{ github.head_ref }}
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+
+      - name: Unit Test
+        run: mise run unit-test
