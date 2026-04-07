@@ -46,6 +46,7 @@ jobs:
         with:
           commit_message: "chore: automated linting"
           commit_user_name: auto-gen-bot
+          file_pattern: "*.go go.mod go.sum **/*.md **/*.yaml **/*.yml !.github/workflows/**"
 
   unit-test:
     needs: [ path-filters, lint-and-format ]
