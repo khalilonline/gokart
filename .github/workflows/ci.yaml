@@ -41,12 +41,14 @@ jobs:
 
       - run: mise run lint-and-format
 
+      - name: Restore workflow files
+        run: git checkout -- .github/workflows/ 2>/dev/null || true
+
       - name: Auto Commit
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore: automated linting"
           commit_user_name: auto-gen-bot
-          file_pattern: "*.go go.mod go.sum **/*.md **/*.yaml **/*.yml !.github/workflows/**"
 
   unit-test:
     needs: [ path-filters, lint-and-format ]
