@@ -1,0 +1,14 @@
+name: Validate Conventional Commits
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: agenthunt/conventional-commit-checker-action@v1.0.0
+        with:
+          pr-title-regex: '^((build|chore|ci|docs|feat|fix|refactor|revert|test)(\(.*\))?(!)?(: (.*\s*)*))|(^Merge (.*\s*)*)|(^Initial commit$)'
+          pr-body-regex: '.*'
