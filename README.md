@@ -36,19 +36,20 @@ Features:
 
 Compared against [zerolog](https://github.com/rs/zerolog) and [zap](https://go.uber.org/zap) on Apple M3 Pro:
 
-| Benchmark | gokart | zerolog | zap |
-| --- | --- | --- | --- |
-| Disabled level | 15.02 ns/op, 1 alloc | 2.98 ns/op, 0 allocs | 20.22 ns/op, 1 alloc |
-| Simple message | 20.57 ns/op, 0 allocs | 42.74 ns/op, 0 allocs | 132.1 ns/op, 0 allocs |
-| With fields (5) | 148.7 ns/op, 1 alloc | 128.2 ns/op, 0 allocs | 307.3 ns/op, 1 alloc |
-| With context | 65.26 ns/op, 1 alloc | 70.22 ns/op, 0 allocs | 202.4 ns/op, 1 alloc |
-| Parallel | 110.7 ns/op, 1 alloc | 17.42 ns/op, 0 allocs | 73.04 ns/op, 1 alloc |
+| Benchmark       | gokart                | zerolog               | zap                   |
+| --------------- | --------------------- | --------------------- | --------------------- |
+| Disabled level  | 15.02 ns/op, 1 alloc  | 2.98 ns/op, 0 allocs  | 20.22 ns/op, 1 alloc  |
+| Simple message  | 20.57 ns/op, 0 allocs | 42.74 ns/op, 0 allocs | 132.1 ns/op, 0 allocs |
+| With fields (5) | 148.7 ns/op, 1 alloc  | 128.2 ns/op, 0 allocs | 307.3 ns/op, 1 alloc  |
+| With context    | 65.26 ns/op, 1 alloc  | 70.22 ns/op, 0 allocs | 202.4 ns/op, 1 alloc  |
+| Parallel        | 110.7 ns/op, 1 alloc  | 17.42 ns/op, 0 allocs | 73.04 ns/op, 1 alloc  |
 
 ### testflags
 
 Test filtering based on the `TEST_TYPE` environment variable.
 
-Examples: 
+Examples:
+
 ```go
 func TestMyFeature(t *testing.T) {
     testflags.UnitTest(t) // skips unless TEST_TYPE=unit
