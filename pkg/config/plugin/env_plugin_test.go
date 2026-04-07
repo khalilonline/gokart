@@ -1,0 +1,105 @@
+package plugin
+
+import (
+	"testing"
+	"time"
+
+	"github.com/khalilonline/gokart/pkg/testflags"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
+)
+
+type envPluginTestSuite struct {
+	suite.Suite
+}
+
+func TestEnvPluginSuite(t *testing.T) {
+	testflags.UnitTest(t)
+	suite.Run(t, new(envPluginTestSuite))
+}
+
+type envTestConfig struct {
+	Host    string        `env:"TEST_HOST"`
+	Port    int           `env:"TEST_PORT" envDefault:"8080"`
+	Debug   bool          `env:"TEST_DEBUG"`
+	Rate    float64       `env:"TEST_RATE"`
+	Timeout time.Duration `env:"TEST_TIMEOUT"`
+	Unset   string
+}
+
+func (s *envPluginTestSuite) TestAllFields() {
+	t := s.T()
+	t.Setenv("TEST_HOST", "localhost")
+	t.Setenv("TEST_PORT", "3000")
+	t.Setenv("TEST_DEBUG", "true")
+	t.Setenv("TEST_RATE", "1.5")
+	t.Setenv("TEST_TIMEOUT", "5s")
+
+	var cfg envTestConfig
+	err := NewEnvPlugin().Load(&cfg)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "localhost", cfg.Host)
+	assert.Equal(t, 3000, cfg.Port)
+	assert.True(t, cfg.Debug)
+	assert.Equal(t, 1.5, cfg.Rate)
+	assert.Equal(t, 5*time.Second, cfg.Timeout)
+	assert.Empty(t, cfg.Unset)
+}
+
+func (s *envPluginTestSuite) TestDefaults() {
+	t := s.T()
+	t.Setenv("TEST_HOST", "localhost")
+
+	var cfg envTestConfig
+	err := NewEnvPlugin().Load(&cfg)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "localhost", cfg.Host)
+	assert.Equal(t, 8080, cfg.Port, "should use envDefault when env var is unset")
+}
+
+func (s *envPluginTestSuite) TestEmptyEnv() {
+	t := s.T()
+
+	var cfg envTestConfig
+	err := NewEnvPlugin().Load(&cfg)
+
+	assert.NoError(t, err)
+	assert.Empty(t, cfg.Host)
+	assert.Equal(t, 8080, cfg.Port, "should use envDefault")
+	assert.False(t, cfg.Debug)
+	assert.Equal(t, 0.0, cfg.Rate)
+}
+
+func (s *envPluginTestSuite) TestInvalidInt() {
+	t := s.T()
+	t.Setenv("TEST_PORT", "abc")
+
+	var cfg envTestConfig
+	err := NewEnvPlugin().Load(&cfg)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "TEST_PORT")
+}
+
+func (s *envPluginTestSuite) TestNestedStruct() {
+	type inner struct {
+		Value string `env:"TEST_INNER_VAL"`
+	}
+	type outer struct {
+		Name  string `env:"TEST_OUTER_NAME"`
+		Inner inner
+	}
+
+	t := s.T()
+	t.Setenv("TEST_OUTER_NAME", "outer")
+	t.Setenv("TEST_INNER_VAL", "inner")
+
+	var cfg outer
+	err := NewEnvPlugin().Load(&cfg)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "outer", cfg.Name)
+	assert.Equal(t, "inner", cfg.Inner.Value)
+}
