@@ -58,10 +58,10 @@ func IntegrationTest(t testing.TB) {
 //
 // You can combine your own TestTypes with those defined in this package like so:
 //
-//	var readerIntegration flags.TestType = "reader_integration"
+//	var readerIntegration testflags.TestType = "reader_integration"
 //
 //	func TestReader(t *testing.T) {
-//	  flags.Evaluate(t, readerIntegration, flags.Integration)
+//	  testflags.Evaluate(t, readerIntegration, testflags.Integration)
 //	  ...
 //	  Test will only run if TEST_TYPE is set to "reader_integration" or "integration"
 //	  ...
