@@ -76,6 +76,14 @@ prettier "**/*.{yml,yaml}" "!.github/workflows/**" --write
 '''
 
 ##################################################
+# Release Tasks
+##################################################
+
+[tasks.tag-release]
+description = "Create and push a new release tag (semver bump)"
+run = "./scripts/git-tag-release.sh"
+
+##################################################
 # Pre-Commit Tasks
 ##################################################
 
