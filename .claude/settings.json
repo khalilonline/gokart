@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "defaultMode": "plan"
-  },
-  "alwaysThinkingEnabled": true,
-  "plansDirectory": "./.claude/plans"
-}
