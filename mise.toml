@@ -72,7 +72,7 @@ prettier "**/*.md" --write
 [tasks.format-yaml]
 description = "Format all YAML files in place using prettier"
 run = '''
-prettier "**/*.{yml,yaml}" --write
+prettier "**/*.{yml,yaml}" "!.github/workflows/**" --write
 '''
 
 ##################################################
