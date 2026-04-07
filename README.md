@@ -6,7 +6,7 @@ A collection of reusable Go packages for building services.
 
 ### logger
 
-High-performance structured JSON logger with zero-allocation field encoding, bitmask-based level gating, and buffer pooling.
+High-performance, composable structured JSON logger with low-allocation field encoding, bitmask-based level gating, and buffer pooling.
 
 ```go
 l := logger.New(os.Stdout, logger.ALL,
