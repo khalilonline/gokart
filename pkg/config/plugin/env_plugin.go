@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"encoding"
 	"fmt"
 	"os"
 	"reflect"
@@ -65,7 +66,15 @@ func loadEnvFields(v reflect.Value) error {
 	return nil
 }
 
+var textUnmarshalerType = reflect.TypeFor[encoding.TextUnmarshaler]()
+
 func setField(field reflect.Value, raw string) error {
+	// If the field (or a pointer to it) implements encoding.TextUnmarshaler,
+	// delegate parsing to it. This handles custom types like logger.Level.
+	if field.CanAddr() && field.Addr().Type().Implements(textUnmarshalerType) {
+		return field.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(raw))
+	}
+
 	// Handle time.Duration specially.
 	if field.Type() == reflect.TypeFor[time.Duration]() {
 		d, err := time.ParseDuration(raw)
