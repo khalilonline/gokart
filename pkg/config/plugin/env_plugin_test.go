@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/khalilonline/gokart/pkg/logger"
 	"github.com/khalilonline/gokart/pkg/testflags"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -81,6 +82,36 @@ func (s *envPluginTestSuite) TestInvalidInt() {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "TEST_PORT")
+}
+
+func (s *envPluginTestSuite) TestTextUnmarshaler() {
+	type cfg struct {
+		Level logger.Level `env:"TEST_LOG_LEVEL"`
+	}
+
+	t := s.T()
+	t.Setenv("TEST_LOG_LEVEL", "info")
+
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, logger.INFO, c.Level)
+}
+
+func (s *envPluginTestSuite) TestTextUnmarshalerInvalidValue() {
+	type cfg struct {
+		Level logger.Level `env:"TEST_LOG_LEVEL"`
+	}
+
+	t := s.T()
+	t.Setenv("TEST_LOG_LEVEL", "invalid")
+
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "TEST_LOG_LEVEL")
 }
 
 func (s *envPluginTestSuite) TestNestedStruct() {
