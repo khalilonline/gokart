@@ -114,6 +114,111 @@ func (s *envPluginTestSuite) TestTextUnmarshalerInvalidValue() {
 	assert.Contains(t, err.Error(), "TEST_LOG_LEVEL")
 }
 
+func (s *envPluginTestSuite) TestStringSlice() {
+	type cfg struct {
+		Hosts []string `env:"TEST_HOSTS"`
+	}
+
+	t := s.T()
+	t.Setenv("TEST_HOSTS", "a.example.com,b.example.com,c.example.com")
+
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"a.example.com", "b.example.com", "c.example.com"}, c.Hosts)
+}
+
+func (s *envPluginTestSuite) TestStringSliceTrimsWhitespaceAndSkipsEmpty() {
+	type cfg struct {
+		Hosts []string `env:"TEST_HOSTS"`
+	}
+
+	t := s.T()
+	// Trailing separator + interior whitespace + empty middle entry.
+	t.Setenv("TEST_HOSTS", "a.example.com,  b.example.com  ,,c.example.com,")
+
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"a.example.com", "b.example.com", "c.example.com"}, c.Hosts)
+}
+
+func (s *envPluginTestSuite) TestStringSliceCustomSeparator() {
+	type cfg struct {
+		Tokens []string `env:"TEST_TOKENS" envSeparator:"|"`
+	}
+
+	t := s.T()
+	t.Setenv("TEST_TOKENS", "alpha|beta|gamma")
+
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"alpha", "beta", "gamma"}, c.Tokens)
+}
+
+func (s *envPluginTestSuite) TestIntSlice() {
+	type cfg struct {
+		Ports []int `env:"TEST_PORTS"`
+	}
+
+	t := s.T()
+	t.Setenv("TEST_PORTS", "8080,8081,8082")
+
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []int{8080, 8081, 8082}, c.Ports)
+}
+
+func (s *envPluginTestSuite) TestIntSliceInvalidElement() {
+	type cfg struct {
+		Ports []int `env:"TEST_PORTS"`
+	}
+
+	t := s.T()
+	t.Setenv("TEST_PORTS", "8080,not-a-number,8082")
+
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "TEST_PORTS")
+	assert.Contains(t, err.Error(), "not-a-number")
+}
+
+func (s *envPluginTestSuite) TestSliceFromDefault() {
+	type cfg struct {
+		Hosts []string `env:"TEST_HOSTS_UNSET" envDefault:"x.example.com,y.example.com"`
+	}
+
+	t := s.T()
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"x.example.com", "y.example.com"}, c.Hosts)
+}
+
+func (s *envPluginTestSuite) TestEmptySliceEnvLeavesFieldZero() {
+	type cfg struct {
+		Hosts []string `env:"TEST_HOSTS_EMPTY"`
+	}
+
+	// Empty/unset env value → field stays nil. Same behaviour as the
+	// scalar empty-env case.
+	t := s.T()
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.NoError(t, err)
+	assert.Nil(t, c.Hosts)
+}
+
 func (s *envPluginTestSuite) TestNestedStruct() {
 	type inner struct {
 		Value string `env:"TEST_INNER_VAL"`

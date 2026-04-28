@@ -6,12 +6,18 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
 // EnvPlugin reads environment variables into struct fields tagged with `env:"VAR_NAME"`.
-// Supports string, int, int64, bool, float64, and time.Duration fields.
-// An optional `envDefault:"value"` tag provides a fallback when the variable is unset or empty.
+// Supports string, int, int64, bool, float64, time.Duration, and slices of any of
+// those (parsed as comma-separated by default; override the separator with
+// `envSeparator:"|"` on the field).
+//
+// An optional `envDefault:"value"` tag provides a fallback when the variable is unset
+// or empty. A field whose type implements `encoding.TextUnmarshaler` (e.g. logger.Level)
+// is parsed via that interface — this also applies to slice element types.
 type EnvPlugin struct{}
 
 // NewEnvPlugin returns an EnvPlugin.
@@ -20,6 +26,9 @@ func NewEnvPlugin() *EnvPlugin {
 }
 
 var _ Plugin = (*EnvPlugin)(nil)
+
+// defaultEnvSeparator splits slice-valued env vars when no `envSeparator` tag is set.
+const defaultEnvSeparator = ","
 
 // Load implements Plugin.
 func (p *EnvPlugin) Load(cfg any) error {
@@ -58,7 +67,12 @@ func loadEnvFields(v reflect.Value) error {
 			continue
 		}
 
-		if err := setField(fieldVal, raw); err != nil {
+		separator := field.Tag.Get("envSeparator")
+		if separator == "" {
+			separator = defaultEnvSeparator
+		}
+
+		if err := setField(fieldVal, raw, separator); err != nil {
 			return fmt.Errorf("field %s (env %q): %w", field.Name, envKey, err)
 		}
 	}
@@ -68,7 +82,43 @@ func loadEnvFields(v reflect.Value) error {
 
 var textUnmarshalerType = reflect.TypeFor[encoding.TextUnmarshaler]()
 
-func setField(field reflect.Value, raw string) error {
+// setField populates field from raw. For slice fields, raw is split by separator
+// and each element is parsed individually via setScalarField. Empty elements
+// (e.g. a trailing separator) are skipped silently rather than treated as zero
+// values, since "a,b," in env-string form almost always represents a list of
+// two and not a list of three.
+func setField(field reflect.Value, raw, separator string) error {
+	if field.Kind() == reflect.Slice {
+		return setSliceField(field, raw, separator)
+	}
+
+	return setScalarField(field, raw)
+}
+
+func setSliceField(field reflect.Value, raw, separator string) error {
+	parts := strings.Split(raw, separator)
+	out := reflect.MakeSlice(field.Type(), 0, len(parts))
+	elemType := field.Type().Elem()
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		elem := reflect.New(elemType).Elem()
+		if err := setScalarField(elem, part); err != nil {
+			return fmt.Errorf("element %q: %w", part, err)
+		}
+
+		out = reflect.Append(out, elem)
+	}
+
+	field.Set(out)
+	return nil
+}
+
+func setScalarField(field reflect.Value, raw string) error {
 	// If the field (or a pointer to it) implements encoding.TextUnmarshaler,
 	// delegate parsing to it. This handles custom types like logger.Level.
 	if field.CanAddr() && field.Addr().Type().Implements(textUnmarshalerType) {
