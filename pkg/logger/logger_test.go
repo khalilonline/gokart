@@ -217,6 +217,93 @@ func TestWithCaller(t *testing.T) {
 	}
 }
 
+func TestWithCaller_EmitterReceivesCallerField(t *testing.T) {
+	testflags.UnitTest(t)
+
+	// Regression: the caller string was written straight to the JSON
+	// buffer but never surfaced as a Field, so emitters (OTel log
+	// bridge etc.) silently dropped it.
+	var captured []Field
+	emitter := func(_ Level, _ string, fields []Field) {
+		captured = append([]Field(nil), fields...)
+	}
+
+	l, _ := capture(INFO, WithCaller(), WithEmitter(emitter))
+	l.Info("test")
+
+	var got Field
+	var found bool
+	for _, f := range captured {
+		if f.Key() == CallerKey {
+			got = f
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("emitter did not receive caller field")
+	}
+	caller, ok := got.Value().(string)
+	if !ok || caller == "" {
+		t.Fatalf("caller field value not a non-empty string: %T %v", got.Value(), got.Value())
+	}
+	if !strings.Contains(caller, "logger_test.go:") {
+		t.Fatalf("caller field value = %q, should contain logger_test.go:", caller)
+	}
+}
+
+func TestWithCaller_EmitterCallerMatchesJSONBuffer(t *testing.T) {
+	testflags.UnitTest(t)
+
+	// The string emitters see must equal what the JSON buffer carries
+	// — drift here would silently fork the two output paths.
+	var captured []Field
+	emitter := func(_ Level, _ string, fields []Field) {
+		captured = append([]Field(nil), fields...)
+	}
+
+	l, buf := capture(INFO, WithCaller(), WithEmitter(emitter))
+	l.Info("test")
+
+	var m map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &m); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	jsonCaller, _ := m["caller"].(string)
+
+	var fieldCaller string
+	for _, f := range captured {
+		if f.Key() == CallerKey {
+			fieldCaller, _ = f.Value().(string)
+			break
+		}
+	}
+	if jsonCaller == "" || fieldCaller == "" {
+		t.Fatalf("expected both caller paths populated, got json=%q field=%q", jsonCaller, fieldCaller)
+	}
+	if jsonCaller != fieldCaller {
+		t.Fatalf("caller drift: json=%q field=%q", jsonCaller, fieldCaller)
+	}
+}
+
+func TestEmitter_NoCallerFieldWhenDisabled(t *testing.T) {
+	testflags.UnitTest(t)
+
+	var captured []Field
+	emitter := func(_ Level, _ string, fields []Field) {
+		captured = append([]Field(nil), fields...)
+	}
+
+	l, _ := capture(INFO, WithEmitter(emitter)) // no WithCaller
+	l.Info("test")
+
+	for _, f := range captured {
+		if f.Key() == CallerKey {
+			t.Fatalf("emitter got caller field with WithCaller disabled: %v", f.Value())
+		}
+	}
+}
+
 func TestWithHook(t *testing.T) {
 	testflags.UnitTest(t)
 
