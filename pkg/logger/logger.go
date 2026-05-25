@@ -156,10 +156,14 @@ func (l *Logger) log(level Level, msg string, fields []Field) {
 		buf = appendTime(buf, l.timestampKey, time.Now().UnixNano(), l.timestampLayout)
 	}
 
-	// 7. Caller.
+	// 7. Caller. Captured once and used twice: written to buf inline
+	// for the JSON output, and surfaced as a Field for emitters so
+	// downstream pipelines (e.g. the OTel log bridge) see it too.
+	var callerStr string
 	if l.addCaller {
 		_, file, line, ok := runtime.Caller(callerSkipBase + l.callerSkip)
 		if ok {
+			callerStr = file + ":" + strconv.Itoa(line)
 			buf = appendKey(buf, CallerKey)
 			buf = append(buf, '"')
 			buf = appendEscapedString(buf, file)
@@ -176,13 +180,26 @@ func (l *Logger) log(level Level, msg string, fields []Field) {
 		}
 	}
 
-	// 8b. Emit to registered emitters (e.g. OTel log bridge).
+	// 8b. Emit to registered emitters (e.g. OTel log bridge). Caller
+	// is prepended as a Field so emitters get the same value the JSON
+	// output carries — without it, the buf-only caller above never
+	// reaches the OTel pipeline.
 	if len(l.emitters) > 0 {
-		emitFields := fields
-		if len(l.contextFields) > 0 {
-			emitFields = make([]Field, 0, len(l.contextFields)+len(fields))
+		extra := 0
+		if callerStr != "" {
+			extra = 1
+		}
+
+		var emitFields []Field
+		if len(l.contextFields) > 0 || extra > 0 {
+			emitFields = make([]Field, 0, len(l.contextFields)+extra+len(fields))
 			emitFields = append(emitFields, l.contextFields...)
+			if extra > 0 {
+				emitFields = append(emitFields, Str(CallerKey, callerStr))
+			}
 			emitFields = append(emitFields, fields...)
+		} else {
+			emitFields = fields
 		}
 
 		for _, e := range l.emitters {
