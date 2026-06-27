@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"encoding"
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -18,6 +19,10 @@ import (
 // An optional `envDefault:"value"` tag provides a fallback when the variable is unset
 // or empty. A field whose type implements `encoding.TextUnmarshaler` (e.g. logger.Level)
 // is parsed via that interface — this also applies to slice element types.
+//
+// A field tagged `envFormat:"json"` is populated by JSON-decoding its env var,
+// regardless of kind. This covers maps, structs, and slices of structs
+// that the scalar/slice parsers can't handle — e.g. a secret injected as a JSON object.
 type EnvPlugin struct{}
 
 // NewEnvPlugin returns an EnvPlugin.
@@ -46,6 +51,23 @@ func loadEnvFields(v reflect.Value) error {
 			continue
 		}
 
+		envKey := field.Tag.Get("env")
+
+		// Decode envFormat:"json" fields before the struct-recursion shortcut
+		// below, so a JSON-tagged struct isn't mistaken for a nested config group.
+		if envKey != "" && field.Tag.Get("envFormat") == "json" {
+			raw := resolveEnvValue(envKey, field)
+			if raw == "" {
+				continue
+			}
+
+			if err := json.Unmarshal([]byte(raw), fieldVal.Addr().Interface()); err != nil {
+				return fmt.Errorf("field %s (env %q): parse json: %w", field.Name, envKey, err)
+			}
+
+			continue
+		}
+
 		// Recurse into embedded or nested structs.
 		if field.Type.Kind() == reflect.Struct {
 			if err := loadEnvFields(fieldVal); err != nil {
@@ -54,15 +76,11 @@ func loadEnvFields(v reflect.Value) error {
 			continue
 		}
 
-		envKey := field.Tag.Get("env")
 		if envKey == "" {
 			continue
 		}
 
-		raw := os.Getenv(envKey)
-		if raw == "" {
-			raw = field.Tag.Get("envDefault")
-		}
+		raw := resolveEnvValue(envKey, field)
 		if raw == "" {
 			continue
 		}
@@ -80,13 +98,21 @@ func loadEnvFields(v reflect.Value) error {
 	return nil
 }
 
+// resolveEnvValue returns the value of envKey, falling back to the field's
+// envDefault tag when the variable is unset or empty.
+func resolveEnvValue(envKey string, field reflect.StructField) string {
+	if raw := os.Getenv(envKey); raw != "" {
+		return raw
+	}
+	return field.Tag.Get("envDefault")
+}
+
 var textUnmarshalerType = reflect.TypeFor[encoding.TextUnmarshaler]()
 
-// setField populates field from raw. For slice fields, raw is split by separator
-// and each element is parsed individually via setScalarField. Empty elements
-// (e.g. a trailing separator) are skipped silently rather than treated as zero
-// values, since "a,b," in env-string form almost always represents a list of
-// two and not a list of three.
+// setField populates field from raw. For slice fields, it splits raw by separator
+// and parses each element via setScalarField. It skips empty elements (e.g. from a
+// trailing separator) rather than treating them as zero values: "a,b," in
+// env-string form represents two items, not three.
 func setField(field reflect.Value, raw, separator string) error {
 	if field.Kind() == reflect.Slice {
 		return setSliceField(field, raw, separator)
