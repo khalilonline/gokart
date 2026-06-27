@@ -219,6 +219,87 @@ func (s *envPluginTestSuite) TestEmptySliceEnvLeavesFieldZero() {
 	assert.Nil(t, c.Hosts)
 }
 
+func (s *envPluginTestSuite) TestJSONMap() {
+	type entry struct {
+		Key    string   `json:"key"`
+		Access []string `json:"access"`
+	}
+	type cfg struct {
+		Keys map[string]entry `env:"TEST_KEYS" envFormat:"json"`
+	}
+
+	t := s.T()
+	t.Setenv("TEST_KEYS", `{"nexus":{"key":"nexus-key","access":["READ","WRITE"]}}`)
+
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "nexus-key", c.Keys["nexus"].Key)
+	assert.Equal(t, []string{"READ", "WRITE"}, c.Keys["nexus"].Access)
+}
+
+func (s *envPluginTestSuite) TestJSONStruct() {
+	type inner struct {
+		Name string `json:"name"`
+		Port int    `json:"port"`
+	}
+	type cfg struct {
+		Inner inner `env:"TEST_INNER" envFormat:"json"`
+	}
+
+	t := s.T()
+	t.Setenv("TEST_INNER", `{"name":"svc","port":9001}`)
+
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "svc", c.Inner.Name)
+	assert.Equal(t, 9001, c.Inner.Port)
+}
+
+func (s *envPluginTestSuite) TestJSONDefault() {
+	type cfg struct {
+		Tags map[string]string `env:"TEST_TAGS_UNSET" envFormat:"json" envDefault:"{\"env\":\"dev\"}"`
+	}
+
+	t := s.T()
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]string{"env": "dev"}, c.Tags)
+}
+
+func (s *envPluginTestSuite) TestJSONUnsetLeavesFieldZero() {
+	type cfg struct {
+		Keys map[string]string `env:"TEST_KEYS_UNSET" envFormat:"json"`
+	}
+
+	t := s.T()
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.NoError(t, err)
+	assert.Nil(t, c.Keys)
+}
+
+func (s *envPluginTestSuite) TestJSONInvalid() {
+	type cfg struct {
+		Keys map[string]string `env:"TEST_KEYS" envFormat:"json"`
+	}
+
+	t := s.T()
+	t.Setenv("TEST_KEYS", "not-json")
+
+	var c cfg
+	err := NewEnvPlugin().Load(&c)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "TEST_KEYS")
+}
+
 func (s *envPluginTestSuite) TestNestedStruct() {
 	type inner struct {
 		Value string `env:"TEST_INNER_VAL"`
