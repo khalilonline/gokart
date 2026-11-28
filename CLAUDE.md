@@ -6,7 +6,10 @@ gokart is a collection of reusable Go packages for building services. The module
 
 ## Packages
 
+- **pkg/config** — Plugin-based loader that populates a struct from environment variables, YAML, or custom sources.
+- **pkg/env** — Detects and resolves the application environment (development, sandbox, staging, production).
 - **pkg/logger** — High-performance structured JSON logger with bitmask-based level gating, field masking, emitters, and context propagation.
+- **pkg/protonum** — Translates generated protobuf enums to stored names and back, checked complete when the translator is built.
 - **pkg/testflags** — Test filtering via `TEST_TYPE` env var. Supports `unit`, `integration`, `performance`, and `security` types.
 - **pkg/utils** — Generic utilities for safe pointer dereferencing, type assertion, and slice conversion.
 

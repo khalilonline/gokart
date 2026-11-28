@@ -44,6 +44,27 @@ Compared against [zerolog](https://github.com/rs/zerolog) and [zap](https://go.u
 | With context    | 65.26 ns/op, 1 alloc  | 70.22 ns/op, 0 allocs | 202.4 ns/op, 1 alloc  |
 | Parallel        | 110.7 ns/op, 1 alloc  | 17.42 ns/op, 0 allocs | 73.04 ns/op, 1 alloc  |
 
+### protonum
+
+Translates generated protobuf enums to the names a service stores, and back. `New` panics unless every defined value but the zero value has a unique, non-empty name, and on a name for the zero value or an undefined number. Build each translator in a package-level variable, so a value added to the proto without a name fails at load, in every test, instead of in one request.
+
+```go
+type ReportReason string // a domain package's own name type
+
+var Reasons = protonum.New(map[eventsv1.ReportReason]ReportReason{
+    eventsv1.ReportReason_REPORT_REASON_SPAM:   "spam",
+    eventsv1.ReportReason_REPORT_REASON_UNSAFE: "unsafe",
+})
+
+name, ok := Reasons.Name(eventsv1.ReportReason_REPORT_REASON_SPAM) // "spam", true
+reason, ok := Reasons.Enum("unsafe")                               // REPORT_REASON_UNSAFE, true
+names, err := Reasons.Names(req.GetReasons())                      // fails with ErrUnnamed on an unnamed value
+reasons, err := Reasons.Enums(stored)                              // fails with ErrUnknownName on an unknown name
+all := Reasons.All()                                               // every name, in enum number order
+```
+
+`Name` and `Enum` report `false` for the zero value, an undefined number, or an unknown name. `NameOf` returns the empty name instead, and `KnownNames` drops values with no name. The batch calls wrap `ErrUnnamed` and `ErrUnknownName`, so each service maps them to its own errors with `errors.Is`.
+
 ### testflags
 
 Test filtering based on the `TEST_TYPE` environment variable.
